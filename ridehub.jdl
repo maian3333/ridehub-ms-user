@@ -1,0 +1,790 @@
+// ======================================================
+// Enums (Keycloak owns roles)
+// ======================================================
+
+// From ms_booking domain enums
+enum BookingStatus { DRAFT, AWAITING_PAYMENT, PAID, CONFIRMED, CANCELED, REFUNDED, RECOVERY_FAILED_SEAT_LOCKS }
+enum PaymentMethod { VNPAY, CREDIT_CARD, BANK_TRANSFER }
+enum PaymentStatus { INITIATED, PROCESSING, SUCCESS, FAILED, REFUNDED, PAYMENT_SUCCESS_BUT_BOOKING_EXPIRED, REQUIRES_MANUAL_REVIEW }
+
+// From ms_route domain enums
+enum StaffStatus { ACTIVE, INACTIVE }
+enum Gender { MALE, FEMALE, OTHER }
+enum VehicleStatus { ACTIVE, MAINTENANCE, RETIRED }
+enum VehicleType { STANDARD_BUS_VIP, STANDARD_BUS_NORMAL, LIMOUSINE }
+enum LockStatus { HELD, EXPIRED, COMMITTED }
+enum SeatType { SLEEPER, NORMAL }
+
+
+// Schedule-driven pricing occasion
+enum OccasionType { NORMAL, WEEKEND, HOLIDAY, PEAK, OFF_PEAK, TET }
+
+// From Avro enums (for cross-service communication)
+enum AvroBookingStatus { PENDING, CONFIRMED, CANCELLED, COMPLETED }
+enum AvroSeatType { ECONOMY, BUSINESS, FIRST_CLASS, VIP }
+enum AvroTicketStatus { AVAILABLE, BOOKED, CANCELLED, EXPIRED, EXCHANGE_REQUESTED, EXCHANGE_APPROVED, EXCHANGE_REJECTED, EXCHANGE_COMPLETED, REFUND_REQUESTED, REFUND_APPROVED, REFUND_REJECTED, REFUND_COMPLETED, REFUND_FAILED }
+enum AvroPaymentStatus { PENDING, COMPLETED, FAILED, REFUNDED }
+enum TransportType { TRAIN, BUS }
+
+// Ticket management enums
+enum ExchangeStatus { EXCHANGE_REQUESTED, EXCHANGE_APPROVED, EXCHANGE_REJECTED, EXCHANGE_COMPLETED }
+enum RefundStatus { REFUND_REQUESTED, REFUND_APPROVED, REFUND_REJECTED, REFUND_COMPLETED, REFUND_FAILED }
+
+// ======================================================
+/* Applications */
+// ======================================================
+
+application {
+  config {
+    baseName gateway
+    packageName com.ridehub.gateway
+    applicationType gateway
+    authenticationType oauth2
+    databaseType no
+    serviceDiscoveryType consul
+    serverPort 8080
+    enableSwaggerCodegen true
+  }
+}
+
+application {
+  config {
+    baseName ms_user
+    packageName com.ridehub.user
+    applicationType microservice
+    authenticationType oauth2
+    databaseType sql
+    devDatabaseType mysql
+    prodDatabaseType mysql
+    cacheProvider redis
+    serviceDiscoveryType consul
+    serverPort 8081
+    enableSwaggerCodegen true
+  }
+  entities AppUser, Profile, FileUser
+}
+
+application {
+  config {
+    baseName ms_route
+    packageName com.ridehub.route
+    applicationType microservice
+    authenticationType oauth2
+    databaseType sql
+    devDatabaseType mysql
+    prodDatabaseType mysql
+    
+    searchEngine elasticsearch
+    cacheProvider redis
+    serviceDiscoveryType consul
+    serverPort 8082
+    enableSwaggerCodegen true
+  }
+  // UPDATED: added ScheduleOccasion; Schedule no longer keeps occasion/occasionFactor
+  entities Province, District, Ward, Address, Station, Route, Vehicle, SeatMap, Floor, Seat, Schedule, ScheduleTimeSlot, ScheduleOccasion, Trip, Staff, Driver, Attendant, SeatLock, FileRoute
+}
+
+application {
+  config {
+    baseName ms_booking
+    packageName com.ridehub.booking
+    applicationType microservice
+    authenticationType oauth2
+    databaseType sql
+    devDatabaseType mysql
+    prodDatabaseType mysql
+    
+    cacheProvider redis
+    serviceDiscoveryType consul
+    serverPort 8083
+    enableSwaggerCodegen true
+  }
+  entities Booking, Ticket, Invoice, PaymentTransaction, AppliedPromotion, PricingSnapshot, PaymentWebhookLog, FileBooking
+}
+
+application {
+  config {
+    baseName ms_promotion
+    packageName com.ridehub.promotion
+    applicationType microservice
+    authenticationType oauth2
+    databaseType sql
+    devDatabaseType mysql
+    prodDatabaseType mysql
+    
+    cacheProvider redis
+    serviceDiscoveryType consul
+    serverPort 8084
+    enableSwaggerCodegen true
+  }
+  entities Promotion, BuyNGetMFree, PercentOffTotal, ConditionByRoute, ConditionByDate, ConditionByLocation, ConditionRouteItem, ConditionDateItem, ConditionLocationItem, FilePromotion
+}
+
+// ======================================================
+// Entities
+// ======================================================
+
+// =============================
+// ms_user
+// =============================
+
+entity AppUser {
+  keycloakId UUID required unique
+  email String required pattern(/^[^@\s]+@[^@\s]+\.[^@\s]+$/) unique
+  phoneNumber String
+  firstName String
+  lastName String
+  dateOfBirth LocalDate
+  isVerified Boolean
+  isActive Boolean required
+  lastLoginAt Instant
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Profile {
+  fullName String
+  birthDate LocalDate
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship OneToOne {
+  AppUser{profile} to Profile{user required}
+}
+
+entity FileUser {
+  bucket String required
+  objectKey String required
+  contentType String
+  size Long
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship OneToOne {
+  Profile{avatar} to FileUser{profile}
+}
+
+// =============================
+// ms_route
+// =============================
+
+entity Province {
+  provinceCode String required unique
+  name String required
+  nameEn String
+  fullName String
+  fullNameEn String
+  codeName String
+  administrativeUnitId Integer
+  administrativeRegionId Integer
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity District {
+  districtCode String required unique
+  name String required
+  nameEn String
+  fullName String
+  fullNameEn String
+  codeName String
+  administrativeUnitId Integer
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Ward {
+  wardCode String required unique
+  name String required
+  nameEn String
+  fullName String
+  fullNameEn String
+  codeName String
+  administrativeUnitId Integer
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Address {
+  streetAddress String required
+  latitude BigDecimal
+  longitude BigDecimal
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship OneToMany {
+  Province{districts} to District{province required},
+  District{wards}     to Ward{district required},
+  Ward{addresses}     to Address{ward required}
+}
+
+entity Station {
+  name String required maxlength(200)
+  phoneNumber String maxlength(32)
+  description String maxlength(1024)
+  active Boolean required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship OneToOne {
+  Station{address required} to Address{station}
+}
+
+entity Route {
+  routeCode String required unique maxlength(40)
+  distanceKm BigDecimal
+  // moved from Trip:
+  baseFare BigDecimal required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship ManyToOne {
+  Route{origin required}      to Station,
+  Route{destination required} to Station
+}
+
+entity SeatMap {
+  name String required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Vehicle {
+  type VehicleType required
+  typeFactor BigDecimal
+  plateNumber String required unique
+  brand String
+  description String
+  status VehicleStatus required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship ManyToOne {
+  Vehicle{seatMap required} to SeatMap
+}
+
+entity Floor {
+  floorNo Integer required
+  priceFactorFloor BigDecimal
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Seat {
+  seatNo String required maxlength(16)
+  rowNo Integer
+  colNo Integer
+  priceFactor BigDecimal
+  type SeatType
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+/* UPDATED: Schedule (occasion removed) */
+entity Schedule {
+  scheduleCode String required unique
+  startDate LocalDate
+  endDate LocalDate
+  daysOfWeek String // e.g. "MON,WED,FRI"
+  active Boolean required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+/* NEW: normalized per-schedule occasion rules */
+entity ScheduleOccasion {
+  occasion OccasionType required unique
+  occasionFactor BigDecimal required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+/* Keep multi-time-per-day capability */
+entity ScheduleTimeSlot {
+  slotCode String required unique
+  departureTime LocalTime required
+  arrivalTime LocalTime required
+  bufferMinutes Integer
+  sequence Integer
+  active Boolean required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+/* UPDATED: Trip carries finalized occasionFactor */
+entity Trip {
+  tripCode String required unique
+  departureTime Instant required
+  arrivalTime Instant required
+  occasionFactor BigDecimal required // resolved from schedule/occasion at generation time
+  // baseFare removed; now on Route
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+// Relationships inside ms_route
+relationship OneToMany {
+  Route{schedules}            to Schedule{route required},
+  Schedule{timeSlots}         to ScheduleTimeSlot{schedule required}
+}
+
+relationship ManyToOne {
+  Schedule{occasionRule required} to ScheduleOccasion{schedule},
+  Floor{seatMap required}     to SeatMap,
+  Seat{floor required}        to Floor,
+  Trip{route required}        to Route,
+  Trip{vehicle required}      to Vehicle,
+  Trip{slot required}         to ScheduleTimeSlot
+}
+
+entity Staff {
+  name String required
+  age Integer
+  gender Gender
+  phoneNumber String
+  status StaffStatus
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Driver {
+  licenseClass String
+  yearsExperience Integer
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Attendant {
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship OneToOne {
+  Driver{staff required}    to Staff{driver},
+  Attendant{staff required} to Staff{attendant}
+}
+
+relationship ManyToOne {
+  Trip{driver required} to Driver,
+  Trip{attendant}       to Attendant
+}
+
+entity SeatLock {
+  seatNo String required maxlength(16)
+  userId Long
+  status LockStatus required
+  expiresAt Instant required
+  idempotencyKey String unique maxlength(80)
+  bookingId Long
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity FileRoute {
+  bucket String required
+  objectKey String required
+  contentType String
+  size Long
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship ManyToOne {
+  Station{stationImg} to FileRoute,
+  Vehicle{vehicleImg} to FileRoute,
+  SeatMap{seatMapImg} to FileRoute
+}
+
+relationship ManyToOne {
+  SeatLock{trip required} to Trip
+}
+
+// =============================
+// ms_booking
+// =============================
+
+entity Ticket {
+  ticketCode String required unique maxlength(40)
+  price BigDecimal required
+  qrCode String maxlength(256)
+  timeFrom Instant
+  timeTo Instant
+  checkedIn Boolean
+  status AvroTicketStatus required
+  exchangeStatus ExchangeStatus
+  refundStatus RefundStatus
+  exchangeReason String
+  refundReason String
+  exchangeRequestedAt Instant
+  exchangeCompletedAt Instant
+  refundRequestedAt Instant
+  refundCompletedAt Instant
+  refundAmount BigDecimal
+  refundTransactionId String maxlength(80)
+  tripId Long required
+  routeId Long required
+  seatId Long required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Booking {
+  bookingCode String required unique
+  status BookingStatus required
+  quantity Integer
+  totalAmount BigDecimal required
+  bookedAt Instant required
+  customerId UUID required
+  idempotencyKey String maxlength(80)
+  tripId Long required
+  lockGroupId String maxlength(36)
+  expiresAt Instant
+  timeoutMinutes Integer
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity Invoice {
+  invoiceNo String required unique
+  issuedAt Instant
+  grossAmount BigDecimal
+  vatAmount BigDecimal
+  netAmount BigDecimal
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity PaymentTransaction {
+  transactionId String required unique maxlength(80)
+  orderRef String maxlength(80)
+  method PaymentMethod
+  status PaymentStatus
+  amount BigDecimal
+  time Instant
+  gatewayCreateDate String maxlength(14)
+  gatewayNote String maxlength(1024)
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity PricingSnapshot {
+  baseFare BigDecimal required            // from Route at booking time
+  vehicleFactor BigDecimal
+  floorFactor BigDecimal
+  seatFactor BigDecimal
+  scheduleOccasionFactor BigDecimal       // copy of Trip.occasionFactor at booking time
+  finalPrice BigDecimal required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity AppliedPromotion {
+  promotionId Long required
+  promotionCode String
+  policyType String
+  percent Integer
+  maxOff BigDecimal
+  discountAmount BigDecimal required
+  appliedAt Instant required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity PaymentWebhookLog {
+  provider String
+  payloadHash String required unique
+  receivedAt Instant required
+  processingStatus String maxlength(64)
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity FileBooking {
+  bucket String required
+  objectKey String required
+  contentType String
+  size Long
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship OneToOne {
+  Ticket{qrCodeImg} to FileBooking{ticket}
+}
+
+relationship ManyToOne {
+  Ticket{originalTicket} to Ticket{exchangedFrom},
+  Ticket{exchangedTicket} to Ticket{exchangedTo}
+}
+
+relationship OneToMany {
+  Booking{tickets}             to Ticket{booking required},
+  Booking{appliedPromos}       to AppliedPromotion{booking required},
+  Booking{pricingSnapshots}    to PricingSnapshot{booking required},
+  PaymentTransaction{webhooks} to PaymentWebhookLog{paymentTransaction required}
+}
+
+relationship OneToOne {
+  Booking{invoice}             to Invoice{booking required},
+  Booking{paymentTransaction}  to PaymentTransaction{booking}
+}
+
+// =============================
+// ms_promotion
+// =============================
+
+entity Promotion {
+  code String required unique
+  description String
+  startDate LocalDate
+  endDate LocalDate
+  usageLimit Integer
+  usedCount Integer
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity BuyNGetMFree {
+  buyN Integer required
+  getM Integer required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity PercentOffTotal {
+  percent Integer required min(1) max(100)
+  maxOff BigDecimal
+  minPrice BigDecimal
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity ConditionByRoute {
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity ConditionByDate {
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity ConditionByLocation {
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity ConditionRouteItem {
+  routeId Long required
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity ConditionDateItem {
+  specificDate LocalDate
+  weekday Integer
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity ConditionLocationItem {
+  provinceId Long
+  districtId Long
+  wardId Long
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+entity FilePromotion {
+  bucket String required
+  objectKey String required
+  contentType String
+  size Long
+  isBanner Boolean
+  createdAt Instant required
+  updatedAt Instant
+  isDeleted Boolean
+  deletedAt Instant
+  deletedBy UUID
+}
+
+relationship OneToMany {
+  Promotion{files} to FilePromotion{promotion required}
+}
+
+relationship OneToMany {
+  Promotion{buyNGetM}        to BuyNGetMFree{promotion required},
+  Promotion{percentOff}      to PercentOffTotal{promotion required},
+  Promotion{conditionsR}     to ConditionByRoute{promotion required},
+  Promotion{conditionsD}     to ConditionByDate{promotion required},
+  Promotion{conditionsLoc}   to ConditionByLocation{promotion required},
+  ConditionByRoute{items}    to ConditionRouteItem{condition required},
+  ConditionByDate{items}     to ConditionDateItem{condition required},
+  ConditionByLocation{items} to ConditionLocationItem{condition required}
+}
+
+// ======================================================
+// Microservice mappings
+// ======================================================
+
+microservice AppUser, Profile, FileUser with ms_user
+
+microservice Province, District, Ward, Address, Station, Route, Vehicle, SeatMap, Floor, Seat, Schedule, ScheduleTimeSlot, ScheduleOccasion, Trip, Staff, Driver, Attendant, SeatLock, FileRoute with ms_route
+
+microservice Booking, Ticket, Invoice, PaymentTransaction, AppliedPromotion, PricingSnapshot, PaymentWebhookLog, FileBooking with ms_booking
+microservice Promotion, BuyNGetMFree, PercentOffTotal, ConditionByRoute, ConditionByDate, ConditionByLocation, ConditionRouteItem, ConditionDateItem, ConditionLocationItem, FilePromotion with ms_promotion
+
+// ======================================================
+// Global options
+// ======================================================
+
+dto * with mapstruct
+service * with serviceImpl
+filter *
+paginate Route, Trip, Vehicle, Station, Booking, Promotion, Ward with infinite-scroll
+search Route, Station with elasticsearch
+
+// ======================================================
+// Deployment (compose)
+// ======================================================
+
+
+
+// ===========================
+// NOTES (manual constraints)
+// ===========================
+
+// - Create composite unique on SeatLock(tripId, seatNo) when status in (HELD, COMMITTED) via Liquibase/Flyway.
+// - Consider Outbox tables in ms_route/ms_booking for Kafka publish-after-commit.
+// - Add proper indexes: Trip(departureTime, route_id, slot_id), Booking(bookingCode), PaymentWebhookLog(payloadHash).
+// - Pricing formula at booking time:
+//   final = Route.baseFare * Vehicle.typeFactor * Floor.priceFactorFloor * Seat.priceFactor * Trip.occasionFactor - promos
+// - When generating Trip from Schedule(+TimeSlot), resolve applicable ScheduleOccasion rule and copy its occasionFactor to Trip.
+// - Ticket management:
+//   * Exchange: originalTicket -> newTicket (status flow: BOOKED -> EXCHANGE_REQUESTED -> EXCHANGE_APPROVED -> EXCHANGE_COMPLETED)
+//   * Refund: status flow: BOOKED -> REFUND_REQUESTED -> REFUND_APPROVED -> REFUND_COMPLETED
+//   * Cancellation: status flow: BOOKED -> CANCELLED
+//   * Add indexes: Ticket(status, exchangeStatus, refundStatus), Ticket(original_ticket_id), Ticket(exchanged_ticket_id)

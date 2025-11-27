@@ -1,0 +1,3 @@
+org.springframework.test.context.ContextCustomizerFactory = \
+    com.ridehub.user.config.SqlTestContainersSpringContextCustomizerFactory,com.\
+    ridehub.user.config.RedisTestContainersSpringContextCustomizerFactory

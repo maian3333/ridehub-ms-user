@@ -1,0 +1,36 @@
+{
+  "generator-jhipster": {
+    "applicationIndex": 1,
+    "applicationType": "microservice",
+    "authenticationType": "oauth2",
+    "baseName": "ms_user",
+    "cacheProvider": "redis",
+    "databaseType": "sql",
+    "devDatabaseType": "mysql",
+    "enableSwaggerCodegen": true,
+    "entities": [
+      "AppUser",
+      "Profile",
+      "FileUser",
+      "ChatSession",
+      "ChatMessage",
+      "UserQuery",
+      "TripRecommendation",
+      "UserStatistics",
+      "TripStatistics"
+    ],
+    "jhipsterVersion": "8.11.0",
+    "jwtSecretKey": "YWU3ZWZiNmNhNTExMjZmZjUyYzAyZmJhYWEzNGY1YjkzZTliNWY2ZGFmNjcwMjIyNDc0OThjYWMwZmNiMjhiNDFhMDQyYWNkY2FkZjgxZjQwNTQ5YjUyMzRkOTUwYWJkYTgzMmQ4YzRlMzk4NjdiNmI3MTJmOWJkYjY3YmQ5YTE=",
+    "languages": ["en"],
+    "lastLiquibaseTimestamp": 1763514686000,
+    "monorepository": true,
+    "nativeLanguage": "en",
+    "packageName": "com.ridehub.user",
+    "prodDatabaseType": "mysql",
+    "serverPort": "8081",
+    "serviceDiscoveryType": "consul",
+    "skipClient": true,
+    "skipCommitHook": true,
+    "skipUserManagement": true
+  }
+}

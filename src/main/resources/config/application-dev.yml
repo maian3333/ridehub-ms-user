@@ -20,13 +20,16 @@ server:
   sql-port: ${SQL_PORT:3308}
   sql-name: ${SQL_NAME:user}
 
-
 # Consul SSH Tunnel configuration for ms_user
 tunnel:
   service-id: msuser
   service-name: msuser
 
 spring:
+  jpa:
+    properties:
+      hibernate.cache.use_second_level_cache: false
+      hibernate.cache.use_query_cache: false
   # ===================================================================
   # DEV profile - fixed and tidied
   # ===================================================================

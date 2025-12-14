@@ -3,7 +3,7 @@ package com.ridehub.user.web.rest;
 import com.ridehub.user.broker.KafkaProducer;
 import com.ridehub.user.service.dto.AppUserDTO;
 import com.ridehub.user.service.dto.auth.CreateAdminRequest;
-import com.ridehub.kafka.service.KafkaUtilityService;
+import com.ridehub.common.kafka.service.KafkaUtilityService;
 
 import java.util.HashMap;
 import java.util.Map;

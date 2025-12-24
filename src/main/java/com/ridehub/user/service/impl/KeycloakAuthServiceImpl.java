@@ -60,7 +60,7 @@ public class KeycloakAuthServiceImpl implements KeycloakAuthService {
             AppUserService appUserService,
             @Value("${spring.security.oauth2.client.registration.oidc.client-id}") String userClientId,
             @Value("${spring.security.oauth2.client.registration.oidc.client-secret:}") String userClientSecret,
-            @Value("${app.keycloak.base-url:https://keycloak.appf4s.io.vn}") String keycloakBaseUrl,
+            @Value("${app.keycloak.base-url:https://keycloak.appf4.io.vn}") String keycloakBaseUrl,
             @Value("${app.keycloak.realm:jhipster}") String realm,
             @Value("${app.keycloak.admin.client-id:svc-admin-bootstrap}") String adminClientId,
             @Value("${app.keycloak.admin.client-secret:EB4eohc7BEY3tw1Rjg7FS8xMLfi95n0n}") String adminClientSecret) {
